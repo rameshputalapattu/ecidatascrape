@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"strings"
 
 	"github.com/playwright-community/playwright-go"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
+	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
 type State struct {
-	Code           string
-	Name           string
-	Constituencies []Constituency
+	bun.BaseModel `bun:"table:state"`
+	Code          string
+	Name          string
 }
 
 func GetStates() []State {
@@ -53,7 +58,6 @@ func GetStates() []State {
 		log.Fatal("could not get All options:", err)
 	}
 
-	log.Println("size of rows:", len(items))
 	if err != nil {
 		log.Fatalf("could not create page: %v", err)
 	}
@@ -80,4 +84,34 @@ func GetStates() []State {
 	}
 	return states
 
+}
+
+func loadStates(dbFile string, states []State) error {
+
+	ctx := context.Background()
+
+	sqldb, err := sql.Open(sqliteshim.ShimName, dbFile)
+	if err != nil {
+		return err
+	}
+	db := bun.NewDB(sqldb, sqlitedialect.New())
+	drop_table_query := `drop table if exists state;`
+	_, err = db.ExecContext(ctx, drop_table_query)
+	if err != nil {
+		return err
+	}
+	var create_table_query string = `create table if not exists state
+	(name text,code text)`
+	_, err = db.ExecContext(ctx, create_table_query)
+	if err != nil {
+		return err
+
+	}
+
+	_, err = db.NewInsert().Model(&states).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

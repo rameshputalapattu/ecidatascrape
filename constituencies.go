@@ -1,24 +1,34 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"strings"
 
 	"github.com/playwright-community/playwright-go"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
+	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
 type Constituency struct {
-	Code string
-	Name string
+	bun.BaseModel `bun:"table:constituency"`
+	Code          string
+	Name          string
+	StateCode     string
 }
 
-func fillConstituencies(states []State) {
+func getAllConstituencies(states []State) []Constituency {
+	var constituencies []Constituency
 	for idx := range states {
 
 		state := states[idx].Code
-		states[idx].Constituencies = getConstituencies(state)
+		constituencies = append(constituencies, getConstituencies(state)...)
 
 	}
+	return constituencies
+
 }
 
 func getConstituencies(state string) []Constituency {
@@ -74,12 +84,43 @@ func getConstituencies(state string) []Constituency {
 			log.Fatalf("could not get statecode: %v", err)
 		}
 		constituency := Constituency{
-			Code: constCode,
-			Name: constName,
+			Code:      constCode,
+			Name:      constName,
+			StateCode: state,
 		}
 		constituencies = append(constituencies, constituency)
 	}
 	//log.Println(constituencies)
 	return constituencies
 
+}
+
+func loadConstituencies(dbFile string, constituencies []Constituency) error {
+
+	ctx := context.Background()
+
+	sqldb, err := sql.Open(sqliteshim.ShimName, dbFile)
+	if err != nil {
+		return err
+	}
+	db := bun.NewDB(sqldb, sqlitedialect.New())
+	drop_table_query := `drop table if exists constituency;`
+	_, err = db.ExecContext(ctx, drop_table_query)
+	if err != nil {
+		return err
+	}
+	var create_table_query string = `create table if not exists constituency
+	(name text,code text,state_code text)`
+	_, err = db.ExecContext(ctx, create_table_query)
+	if err != nil {
+		return err
+
+	}
+
+	_, err = db.NewInsert().Model(&constituencies).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

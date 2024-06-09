@@ -1,0 +1,23 @@
+version: '3'
+
+tasks:
+  build:
+    desc:
+      build eci data scraper
+    
+    cmds:
+      - go build -o ecidatascrape
+    silent: true
+
+  run:
+    desc:
+      run the eci data scraper
+    cmds:
+     - ./ecidatascrape
+  clean:
+    desc:
+      remove the executable
+    cmds:
+      - rm ./ecidatascrape
+      - rm data/elections_2024.db
+  

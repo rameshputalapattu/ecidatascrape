@@ -1,18 +1,33 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"strconv"
 	"strings"
 
 	"github.com/playwright-community/playwright-go"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
+	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
 type CandidateDetail struct {
+	bun.BaseModel    `bun:"table:candidate_detail"`
 	Name             string
 	Party            string
 	NumVotes         int64
 	ConstituencyCode string
+}
+
+func GetAllCandidateDetails(constituencies []Constituency) []CandidateDetail {
+	var candidatedetails []CandidateDetail
+	for _, constituency := range constituencies {
+		candidatedetails = append(candidatedetails, GetCandidateDetails(constituency.Code)...)
+	}
+	return candidatedetails
+
 }
 
 func GetCandidateDetails(constituencyCode string) []CandidateDetail {
@@ -61,7 +76,10 @@ func GetCandidateDetails(constituencyCode string) []CandidateDetail {
 		numVotesStr = strings.Split(numVotesStr, " ")[0]
 		numVotes, err := strconv.Atoi(numVotesStr)
 		if err != nil {
-			log.Fatal("error converting str to int")
+			if numVotesStr != "Uncontested" {
+				log.Fatal("error converting str to int:", err, constituencyCode)
+			}
+
 		}
 
 		candName, err := item.Locator(".nme-prty > h5").TextContent()
@@ -72,7 +90,7 @@ func GetCandidateDetails(constituencyCode string) []CandidateDetail {
 		if err != nil {
 			log.Fatal("unable to fetch party name:", party)
 		}
-		log.Println(candName, party, numVotes)
+
 		candidatedetail := CandidateDetail{
 			Name:     candName,
 			Party:    party,
@@ -82,4 +100,34 @@ func GetCandidateDetails(constituencyCode string) []CandidateDetail {
 	}
 
 	return candidatedetails
+}
+
+func loadCandidateDetails(dbFile string, candidatedetails []CandidateDetail) error {
+
+	ctx := context.Background()
+
+	sqldb, err := sql.Open(sqliteshim.ShimName, dbFile)
+	if err != nil {
+		return err
+	}
+	db := bun.NewDB(sqldb, sqlitedialect.New())
+	drop_table_query := `drop table if exists candidate_detail;`
+	_, err = db.ExecContext(ctx, drop_table_query)
+	if err != nil {
+		return err
+	}
+	var create_table_query string = `create table if not exists candidate_detail
+	(name text,party text,num_votes integer,constituency_code text)`
+	_, err = db.ExecContext(ctx, create_table_query)
+	if err != nil {
+		return err
+
+	}
+
+	_, err = db.NewInsert().Model(&candidatedetails).Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

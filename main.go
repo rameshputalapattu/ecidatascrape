@@ -1,11 +1,24 @@
 package main
 
-import "fmt"
+import (
+	"log"
+)
 
 func main() {
 	states := GetStates()
-	fillConstituencies(states)
-	fmt.Println(states)
-	candidatedetails := GetCandidateDetails("S0125")
-	fmt.Println(candidatedetails)
+	err := loadStates("data/elections_2024.db", states)
+	if err != nil {
+		log.Fatal("error loading the states data", err)
+	}
+	constituencies := getAllConstituencies(states)
+	err = loadConstituencies("data/elections_2024.db", constituencies)
+	if err != nil {
+		log.Fatal("error loading constituencies:", err)
+	}
+	candidatedetails := GetAllCandidateDetails(constituencies)
+	err = loadCandidateDetails("data/elections_2024.db", candidatedetails)
+	if err != nil {
+		log.Fatal("error loading constituencies:", err)
+	}
+
 }
