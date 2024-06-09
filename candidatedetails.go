@@ -92,9 +92,10 @@ func GetCandidateDetails(constituencyCode string) []CandidateDetail {
 		}
 
 		candidatedetail := CandidateDetail{
-			Name:     candName,
-			Party:    party,
-			NumVotes: int64(numVotes),
+			Name:             candName,
+			Party:            party,
+			NumVotes:         int64(numVotes),
+			ConstituencyCode: constituencyCode,
 		}
 		candidatedetails = append(candidatedetails, candidatedetail)
 	}
